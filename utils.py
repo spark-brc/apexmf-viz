@@ -13,6 +13,58 @@ from matplotlib import cm
 import numpy as np
 from hydroeval import evaluator, nse, rmse, pbias
 import base64
+import datetime
+from io import StringIO
+
+def define_sim_period2(cont_file):
+
+    stringio = StringIO(cont_file.getvalue().decode("utf-8"))
+    f = stringio.read().splitlines()
+
+    # with open(cont_file, 'r') as f:
+    data = [x.strip().split() for x in f if x.strip()]
+    numyr = int(data[0][0])
+    styr = int(data[0][1])
+    stmon = int(data[0][2])
+    stday = int(data[0][3])
+    ptcode = int(data[0][4])
+    edyr = styr + numyr -1
+    stdate = datetime.datetime(styr, stmon, 1) + datetime.timedelta(stday - 1)
+    eddate = datetime.datetime(edyr, 12, 31) 
+    duration = (eddate - stdate).days
+
+    ##### 
+    start_month = stdate.strftime("%b")
+    start_day = stdate.strftime("%d")
+    start_year = stdate.strftime("%Y")
+    end_month = eddate.strftime("%b")
+    end_day = eddate.strftime("%d")
+    end_year = eddate.strftime("%Y")
+
+    # NOTE: This is later when we are handling model with different time steps
+    # # Check IPRINT option
+    # if ptcode == 3 or ptcode == 4 or ptcode == 5:  # month
+    #     self.dlg.comboBox_SD_timeStep.clear()
+    #     self.dlg.comboBox_SD_timeStep.addItems(['Monthly', 'Annual'])
+    #     self.dlg.radioButton_month.setChecked(1)
+    #     self.dlg.radioButton_month.setEnabled(True)
+    #     self.dlg.radioButton_day.setEnabled(False)
+    #     self.dlg.radioButton_year.setEnabled(False)
+    # elif ptcode == 6 or ptcode == 7 or ptcode == 8 or ptcode == 9:
+    #     self.dlg.comboBox_SD_timeStep.clear()
+    #     self.dlg.comboBox_SD_timeStep.addItems(['Daily', 'Monthly', 'Annual'])
+    #     self.dlg.radioButton_day.setChecked(1)
+    #     self.dlg.radioButton_day.setEnabled(True)
+    #     self.dlg.radioButton_month.setEnabled(False)
+    #     self.dlg.radioButton_year.setEnabled(False)
+    # elif ptcode == 0 or ptcode == 1 or ptcode == 2:
+    #     self.dlg.comboBox_SD_timeStep.clear()
+    #     self.dlg.comboBox_SD_timeStep.addItems(['Annual'])
+    #     self.dlg.radioButton_year.setChecked(1)
+    #     self.dlg.radioButton_year.setEnabled(True)
+    #     self.dlg.radioButton_day.setEnabled(False)
+    #     self.dlg.radioButton_month.setEnabled(False)
+    return stdate, eddate, start_year, end_year
 
 
 def get_sim_obd(sim_file, obd_file, obds_list, sims_list, stdate, caldate, eddate):
@@ -44,8 +96,6 @@ def get_sim_obd(sim_file, obd_file, obds_list, sims_list, stdate, caldate, eddat
     tot_df.index = pd.to_datetime(tot_df.index).normalize()
     tot_df = tot_df[caldate:eddate]
     return tot_df
-
-
 
 
 def get_plot(df, sims):
@@ -105,7 +155,6 @@ def get_matplotlib_cmap(cmap_name, bins, alpha=1):
     C = list(map(np.uint8, np.array(cmap(bins * h)[:3]) * 255))
     contour_colour_list.append('rgba' + str((C[0], C[1], C[2], alpha)))
     return contour_colour_list
-
 
 
 def get_stats(df):
