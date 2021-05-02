@@ -24,9 +24,6 @@ LINE = """<style>
 </style>
 <div class="vl"></div>"""
 
-
-
-
 st.set_page_config(
     layout="wide",
     initial_sidebar_state='collapsed',
@@ -35,7 +32,6 @@ st.set_page_config(
     )
 st.title('APEX Model - Streamflow Analysis')
 st.markdown("## User Inputs:")
-
 
 col1, line, col2 = st.beta_columns([0.4,0.1,0.4])
 
@@ -58,50 +54,78 @@ if cont_file:
             "Set Analysis Period:",
             min_value=int(start_year),
             max_value=int(end_year), value=(int(start_year),int(end_year)))
-        sims = st.text_input('Enter Reach IDs (e.g., 12, 16, 99):')
-        obds = st.text_input('Enter column names from the observation file:')
-    sims_list = sims.split(",")
-    obds_list = obds.split(",")
-    obds_list = [i.strip() for i in obds_list]
-    sims_list = [i.strip() for i in sims_list]
     caldate = datetime.datetime(val_range[0], 1, 1)
     eddate = datetime.datetime(val_range[1], 12, 31)
 ###
+wnam = None
+rchids2 = None
+obsids = []
+if sim_file:
+    stf_df, rchids = utils.get_sims_rchids(sim_file)
+    with col2:
+        rchids2 = st.multiselect('Select Reach IDs:', rchids)
+    if (rchids2 is not None) and (obd_file is None):
+        with col2:
+            obsids2 = st.multiselect('Select Observation Column Names:', obsids)
+            wnam = st.text_input('Enter Watershed Name:')
+    elif rchids2 and obd_file:
+        obd_df, obsids = utils.get_obd_obs(obd_file)
+        with col2:
+            obsids2 = st.multiselect('Select Observation Column Names:', obsids)
+            wnam = st.text_input('Enter Watershed Name:')
+
+
 
 def main(df, sims_list):
-    with st.beta_expander('Dataframe for Simulated and Observed Stream Discharge'):
+
+    with st.beta_expander('{} Dataframe for Simulated and Observed Stream Discharge'.format(wnam)):
         st.dataframe(df, height=500)
         st.markdown(utils.filedownload(df), unsafe_allow_html=True)
-    stats_df = utils.get_stats_df(df, sims_list)
-    with col2:
-        st.markdown(
-            """
-            ### Objective Functions
-            """)
-        st.dataframe(stats_df.T)
-    st.markdown("## Hydrographs for stream discharge")
-    st.plotly_chart(utils.get_plot(df, sims_list), use_container_width=True)
-    tcol1, tcol2 = st.beta_columns([0.55, 0.45])
-    with tcol1:
-        st.markdown("## Flow Duration Curve")
-    pcol1, pcol2= st.beta_columns([0.1, 0.9])
-    with pcol1:
-        yscale = st.radio("Select Y-axis scale", ["Linear", "Logarithmic"])
-    with pcol2:
-        st.plotly_chart(utils.get_fdcplot(df, sims_list, yscale), use_container_width=True)
+
+    if obd_file:
+        stats_df = utils.get_stats_df(df, sims_list)
+        with col2:
+            st.markdown(
+                """
+                ### Objective Functions
+                """)
+            st.dataframe(stats_df.T)
+        st.markdown("## Hydrographs for stream discharge")
+        st.plotly_chart(utils.get_plot(df, sims_list), use_container_width=True)
+        tcol1, tcol2 = st.beta_columns([0.55, 0.45])
+        with tcol1:
+            st.markdown("## Flow Duration Curve")
+        pcol1, pcol2= st.beta_columns([0.1, 0.9])
+        with pcol1:
+            yscale = st.radio("Select Y-axis scale", ["Linear", "Logarithmic"])
+        with pcol2:
+            st.plotly_chart(utils.get_fdcplot(df, sims_list, yscale), use_container_width=True)
+    elif obd_file is None:
+        st.markdown("## Hydrographs for stream discharge")
+        st.plotly_chart(utils.get_sim_plot(df, sims_list), use_container_width=True)
+        tcol1, tcol2 = st.beta_columns([0.55, 0.45])
+        with tcol1:
+            st.markdown("## Flow Duration Curve")
+        pcol1, pcol2= st.beta_columns([0.1, 0.9])
+        with pcol1:
+            yscale = st.radio("Select Y-axis scale", ["Linear", "Logarithmic"])
+        with pcol2:
+            st.plotly_chart(utils.get_sim_fdcplot(df, sims_list, yscale), use_container_width=True)
+
 
 
 @st.cache
 def load_data():
-    df = utils.get_sim_obd(sim_file, obd_file, obds_list, sims_list, stdate, caldate, eddate)
-    return df, sims_list
+    if obd_file is None:
+        df = utils.get_sim(stf_df, rchids2, stdate, caldate, eddate)
+    elif obd_file:
+        df = utils.get_sim_obd2(stf_df, obd_df, rchids2, obsids2, stdate, caldate, eddate)
+    return df, rchids2
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.CRITICAL)
-    if sim_file and obd_file and sims and obds:
+    # if rchids2 and obsids2 and wnam:
+    if wnam and rchids2:
         df, sims_list = load_data()
         main(df, sims_list)
-
-
-

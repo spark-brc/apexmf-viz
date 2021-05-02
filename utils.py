@@ -66,6 +66,60 @@ def define_sim_period2(cont_file):
     #     self.dlg.radioButton_month.setEnabled(False)
     return stdate, eddate, start_year, end_year
 
+@st.cache
+def get_sims_rchids(sim_file):
+    stf_df = pd.read_csv(
+                    sim_file,
+                    delim_whitespace=True,
+                    skiprows=9,
+                    usecols=[0, 1, 8],
+                    names=['idx', 'rchid', 'sim'],
+                    index_col=0)
+    stf_df = stf_df.loc["REACH"]
+    rchids = stf_df.rchid.unique()
+    return stf_df, rchids
+
+@st.cache
+def get_obd_obs(obd_file):
+    obd_df = pd.read_csv(
+                        obd_file,
+                        sep=r'\s+', index_col=0, header=0,
+                        parse_dates=True, delimiter="\t",
+                        na_values=[-999, ""]
+                        )
+    obsids = obd_df.columns
+    return obd_df, obsids
+
+
+def get_sim(stf_df, rchids, stdate, caldate, eddate):
+    tot_sim = pd.DataFrame()
+    for i in rchids:
+        df2 = stf_df.loc[stf_df['rchid'] == int(i)]
+        df2.index = pd.date_range(stdate, periods=len(df2.sim), freq='M')
+        df2.rename(columns = {'sim':'sim_{:03d}'.format(int(i))}, inplace = True)
+        tot_sim = pd.concat([tot_sim, df2.loc[:, 'sim_{:03d}'.format(int(i))]], axis=1,
+            # sort=False
+            )
+    tot_sim = tot_sim[caldate:eddate]
+    return tot_sim
+
+
+
+def get_sim_obd2(stf_df, obd_df, rchids2, obsids2, stdate, caldate, eddate):
+    obd_df = obd_df[obsids2]
+
+    tot_sim = pd.DataFrame()
+    for i in rchids2:
+        df2 = stf_df.loc[stf_df['rchid'] == int(i)]
+        df2.index = pd.date_range(stdate, periods=len(df2.sim), freq='M')
+        df2.rename(columns = {'sim':'sim_{:03d}'.format(int(i))}, inplace = True)
+        tot_sim = pd.concat([tot_sim, df2.loc[:, 'sim_{:03d}'.format(int(i))]], axis=1,
+            # sort=False
+            )
+    tot_df = pd.concat([tot_sim, obd_df], axis=1)
+    tot_df.index = pd.to_datetime(tot_df.index).normalize()
+    tot_df = tot_df[caldate:eddate]
+    return tot_df
 
 def get_sim_obd(sim_file, obd_file, obds_list, sims_list, stdate, caldate, eddate):
 
@@ -138,6 +192,39 @@ def get_plot(df, sims):
                                             ),
                     selector=dict(mode='markers'))
     return fig
+
+
+def get_sim_plot(df, sims):
+    fig = go.Figure()
+    colors = (get_matplotlib_cmap('tab10', bins=8))
+
+    for i in range(len(sims)):
+        fig.add_trace(go.Scatter(
+            x=df.index, y=df.iloc[:, i], name='Reach {}'.format(sims[i]),
+            line=dict(color=colors[i], width=2),
+            legendgroup='Reach {}'.format(sims[i])
+            ))
+    # line_fig = px.line(df, height=500, width=1200)
+    fig.update_layout(
+        # showlegend=False,
+        plot_bgcolor='white',
+        height=600,
+        # width=1200
+    )
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgray', title='')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgray', title='Stream Discharge (m<sup>3</sup>/s)')
+    fig.update_layout(legend=dict(
+        yanchor="top",
+        y=1.0,
+        xanchor="center",
+        x=0.5,
+        orientation="h",
+        title='',
+    ))
+    return fig
+
+
+
 
 
 # def get_subnums(wd, rch_file)
@@ -286,6 +373,38 @@ def get_fdcplot(df, sims, yscale):
                                             color='white')
                                             ),
                     selector=dict(mode='markers'))
+    if yscale == 'Logarithmic':
+        fig.update_yaxes(type="log")
+    return fig
+
+
+def get_sim_fdcplot(df, sims, yscale):
+    fig = go.Figure()
+    colors = (get_matplotlib_cmap('tab10', bins=8))
+    for i in range(len(sims)):
+        sort = np.sort(df.iloc[:, i])[::-1]
+        exceedence = np.arange(1.,len(sort)+1) / len(sort)
+        fig.add_trace(go.Scatter(
+            x=exceedence*100, y=sort, name='Reach {}'.format(sims[i]),
+            line=dict(color=colors[i], width=2),
+            legendgroup='Reach {}'.format(sims[i])
+            ))
+    fig.update_layout(
+        # showlegend=False,
+        plot_bgcolor='white',
+        height=700,
+        # width=1200
+    )
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgray', title='Exceedance Probability (%)')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgray', title='Monthly Average Stream Discharge (m<sup>3</sup>/s)')
+    fig.update_layout(legend=dict(
+        yanchor="top",
+        y=1.0,
+        xanchor="center",
+        x=0.5,
+        orientation="h",
+        title='',
+    ))
     if yscale == 'Logarithmic':
         fig.update_yaxes(type="log")
     return fig
