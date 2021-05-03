@@ -264,7 +264,7 @@ def get_stats_df(df, sims):
     for i in range(len(sims)):
         exdf = df.iloc[:, [i, i+len(sims)]]
         df_list = get_stats(exdf)
-        stat_series = pd.Series(['{:.2f}'.format(x) for x in df_list], name='Reach {}'.format(sims[i]))
+        stat_series = pd.Series(['{:.3f}'.format(x) for x in df_list], name='Reach {}'.format(sims[i]))
         stats_df = pd.concat([stats_df, stat_series], axis=1)
     stats_df.index = ['NSE', 'RMSE', 'PBIAS', 'R-squared']
     return stats_df
