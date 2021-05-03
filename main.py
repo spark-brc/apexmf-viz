@@ -30,6 +30,11 @@ st.set_page_config(
     page_title='APEX Visualization',
     page_icon='icon2.png' 
     )
+# t, v = st.beta_columns([0.8,0.2])
+# with t:
+#     st.title('APEX Model - Streamflow Analysis')
+# with v:
+#     st.markdown('#### 1.1')
 st.title('APEX Model - Streamflow Analysis')
 st.markdown("## User Inputs:")
 
