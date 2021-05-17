@@ -16,13 +16,152 @@ import base64
 import datetime
 from io import StringIO
 
-def define_sim_period2(cont_file):
 
-    stringio = StringIO(cont_file.getvalue().decode("utf-8"))
+
+LINE = """<style>
+.vl {
+  border-left: 2px solid gray;
+  height: 400px;
+  position: absolute;
+  left: 50%;
+  margin-left: -3px;
+  top: 0;
+}
+</style>
+<div class="vl"></div>"""
+
+
+
+def init_set(wd_path, line, col1, col2, obsids, obd_file): 
+    if os.path.exists(os.path.join(wd_path, 'APEXCONT.DAT')):
+        uploaded_file = st.file_uploader("Choose a file")
+
+        stdate, eddate, start_year, end_year = define_sim_period2(wd_path, uploaded_file)
+        with line:
+            st.markdown(LINE, unsafe_allow_html=True)
+        with col2:
+            stdate = st.date_input(
+                "Simulation Start Day",
+                stdate
+                )
+            val_range = st.slider(
+                "Set Analysis Period:",
+                min_value=int(start_year),
+                max_value=int(end_year), value=(int(start_year),int(end_year)))
+        caldate = datetime.datetime(val_range[0], 1, 1)
+        eddate = datetime.datetime(val_range[1], 12, 31)
+        with col1:
+            st.markdown(
+                """
+                <p>😄<span style="color:LimeGreen;font-weight:bold">
+                Searching for 'APEXCONT.DAT' file ... passed</span></p>
+                """,
+                unsafe_allow_html=True
+                )
+            st.markdown("'APEXCONT.DAT' file found!")
+    else:
+        with col1:
+            st.markdown(
+                """
+                <p>😱<span style="color:OrangeRed;font-weight:bold">
+                Searching for 'APEXCONT.DAT' file ... failed</span></p>
+                """,
+                unsafe_allow_html=True
+            )
+            st.markdown("'APEXCONT.DAT' file is missing.")
+    rch_files = find_rch_files(wd_path)
+    obd_files = find_obd_files(wd_path) 
+
+    if rch_files:
+        if os.path.exists(os.path.join(wd_path, rch_files[0])):
+            sim_file = os.path.join(wd_path, rch_files[0])
+            with col1:
+                st.markdown(
+                    """
+                    <p>😄<span style="color:LimeGreen;font-weight:bold">
+                    Searching for '*.RCH' file ... passed</span></p>
+                    """,
+                    unsafe_allow_html=True
+                    )
+                st.write("'{}' file found!".format(rch_files[0]))
+            stf_df, rchids = get_sims_rchids(sim_file)
+            with col2:
+                rchids2 = st.multiselect('Select Reach IDs:', rchids)
+
+        if obd_files:
+            if os.path.exists(os.path.join(wd_path, obd_files[0])):
+                obd_file = os.path.join(wd_path, obd_files[0])
+                with col1:
+                    st.markdown(
+                        """
+                        <p>😄<span style="color:LimeGreen;font-weight:bold">
+                        Searching for '*.obd' file ... passed</span></p>
+                        """,
+                        unsafe_allow_html=True
+                        )
+                    st.write("'{}' file found!".format(obd_files[0]))
+                obd_df, obsids = get_obd_obs(obd_file)
+                with col2:
+                    obsids2 = st.multiselect('Select Observation Column Names:', obsids)
+                    wnam = st.text_input('Enter Watershed Name:')
+        else:
+        # elif (rchids2 is not None) and (obd_files is None):
+            obd_df = None
+            with col1:
+                st.markdown(
+                    """
+                    <p>😝<span style="color:SlateBlue;font-weight:bold">
+                    Searching for '*.obd' file ... failed</span></p>
+                    """,
+                    unsafe_allow_html=True
+                )                
+                st.write(
+                    "*.obd file is missing but it's okay. You can keep analyzing simulated streamflow."
+                    )
+            with col2:
+                obsids2 = st.multiselect('Select Observation Column Names:', obsids)
+                wnam = st.text_input('Enter Watershed Name:')   
+    else:
+        with col1:
+            stf_df = None
+            obd_df = None
+            rchids2 = None
+            obsids2 = None
+            wnam =None
+            st.markdown(
+                """
+                <p>😱<span style="color:OrangeRed;font-weight:bold">
+                Searching for '*.RCH' file ... failed</span></p>
+                """,
+                unsafe_allow_html=True
+            )                
+            st.write("*.RCH file is missing! Please, provide *.RCH file!")
+    return stf_df, obd_file, stdate, caldate, eddate, obd_df, rchids2, obsids2, wnam
+
+
+def find_rch_files(wd):
+    rch_files = []
+    for filename in glob.glob(str(wd)+"/*.RCH"):
+        rch_files.append(os.path.basename(filename))
+    
+    return rch_files
+
+def find_obd_files(wd):
+    obd_files = []
+    for filename in glob.glob(str(wd)+"/*.obd"):
+        obd_files.append(os.path.basename(filename))
+    
+    return obd_files
+
+
+def define_sim_period2(wd, uploaded_file):
+    # cont_file = os.path.join(wd, 'APEXCONT.DAT')
+    stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
     f = stringio.read().splitlines()
-
-    # with open(cont_file, 'r') as f:
+    # with open(os.path.join(wd, 'APEXCONT.DAT'), "r") as f:
     data = [x.strip().split() for x in f if x.strip()]
+    # # with open(cont_file, 'r') as f:
+    # data = [x.strip().split() for x in f if x.strip()]
     numyr = int(data[0][0])
     styr = int(data[0][1])
     stmon = int(data[0][2])
@@ -41,30 +180,8 @@ def define_sim_period2(cont_file):
     end_day = eddate.strftime("%d")
     end_year = eddate.strftime("%Y")
 
-    # NOTE: This is later when we are handling model with different time steps
-    # # Check IPRINT option
-    # if ptcode == 3 or ptcode == 4 or ptcode == 5:  # month
-    #     self.dlg.comboBox_SD_timeStep.clear()
-    #     self.dlg.comboBox_SD_timeStep.addItems(['Monthly', 'Annual'])
-    #     self.dlg.radioButton_month.setChecked(1)
-    #     self.dlg.radioButton_month.setEnabled(True)
-    #     self.dlg.radioButton_day.setEnabled(False)
-    #     self.dlg.radioButton_year.setEnabled(False)
-    # elif ptcode == 6 or ptcode == 7 or ptcode == 8 or ptcode == 9:
-    #     self.dlg.comboBox_SD_timeStep.clear()
-    #     self.dlg.comboBox_SD_timeStep.addItems(['Daily', 'Monthly', 'Annual'])
-    #     self.dlg.radioButton_day.setChecked(1)
-    #     self.dlg.radioButton_day.setEnabled(True)
-    #     self.dlg.radioButton_month.setEnabled(False)
-    #     self.dlg.radioButton_year.setEnabled(False)
-    # elif ptcode == 0 or ptcode == 1 or ptcode == 2:
-    #     self.dlg.comboBox_SD_timeStep.clear()
-    #     self.dlg.comboBox_SD_timeStep.addItems(['Annual'])
-    #     self.dlg.radioButton_year.setChecked(1)
-    #     self.dlg.radioButton_year.setEnabled(True)
-    #     self.dlg.radioButton_day.setEnabled(False)
-    #     self.dlg.radioButton_month.setEnabled(False)
     return stdate, eddate, start_year, end_year
+    
 
 @st.cache
 def get_sims_rchids(sim_file):
@@ -259,14 +376,24 @@ def get_stats(df):
     return df_nse, df_rmse, df_pibas, r_squared
 
 
-def get_stats_df(df, sims):
+def get_stats_df(df, sims, col1):
     stats_df = pd.DataFrame()
-    for i in range(len(sims)):
-        exdf = df.iloc[:, [i, i+len(sims)]]
-        df_list = get_stats(exdf)
-        stat_series = pd.Series(['{:.2f}'.format(x) for x in df_list], name='Reach {}'.format(sims[i]))
-        stats_df = pd.concat([stats_df, stat_series], axis=1)
-    stats_df.index = ['NSE', 'RMSE', 'PBIAS', 'R-squared']
+    try:
+        for i in range(len(sims)):
+            exdf = df.iloc[:, [i, i+len(sims)]]
+            df_list = get_stats(exdf)
+            stat_series = pd.Series(['{:.3f}'.format(x) for x in df_list], name='Reach {}'.format(sims[i]))
+            stats_df = pd.concat([stats_df, stat_series], axis=1)
+        stats_df.index = ['NSE', 'RMSE', 'PBIAS', 'R-squared']
+    except IndexError:
+        with col1:
+            st.markdown(
+                """
+                <p>🤔<span style="color:SlateBlue;font-weight:bold">
+                Please, match Reach IDs and Observation Columns ~</span></p>
+                """,
+                unsafe_allow_html=True
+            )                
     return stats_df
 
 

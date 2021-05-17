@@ -9,20 +9,10 @@ import glob
 import datetime
 import utils
 from io import StringIO
+import time
 
 pd.options.mode.chained_assignment = None
 
-LINE = """<style>
-.vl {
-  border-left: 2px solid gray;
-  height: 400px;
-  position: absolute;
-  left: 50%;
-  margin-left: -3px;
-  top: 0;
-}
-</style>
-<div class="vl"></div>"""
 
 st.set_page_config(
     layout="wide",
@@ -30,60 +20,35 @@ st.set_page_config(
     page_title='APEX Visualization',
     page_icon='icon2.png' 
     )
+# t, v = st.beta_columns([0.8,0.2])
+# with t:
+#     st.title('APEX Model - Streamflow Analysis')
+# with v:
+#     st.markdown('#### 1.1')
 st.title('APEX Model - Streamflow Analysis')
 st.markdown("## User Inputs:")
 
 col1, line, col2 = st.beta_columns([0.4,0.1,0.4])
 
 with col1:
-    cont_file = st.file_uploader("Provide 'APEXCONT.DAT' file")
-    sim_file = st.file_uploader("Provide *.RCH file")
-    obd_file = st.file_uploader("Provide 'stf_mon.obd' file")
+    wd_path = st.text_input("Provid the path of project directory:")
 
-### 
-if cont_file:
-    stdate, eddate, start_year, end_year = utils.define_sim_period2(cont_file)
-    with line:
-        st.markdown(LINE, unsafe_allow_html=True)
-    with col2:
-        stdate = st.date_input(
-            "Simulation Start Day",
-            stdate
-            )
-        val_range = st.slider(
-            "Set Analysis Period:",
-            min_value=int(start_year),
-            max_value=int(end_year), value=(int(start_year),int(end_year)))
-    caldate = datetime.datetime(val_range[0], 1, 1)
-    eddate = datetime.datetime(val_range[1], 12, 31)
-###
 wnam = None
 rchids2 = None
 obsids = []
-if sim_file:
-    stf_df, rchids = utils.get_sims_rchids(sim_file)
-    with col2:
-        rchids2 = st.multiselect('Select Reach IDs:', rchids)
-    if (rchids2 is not None) and (obd_file is None):
-        with col2:
-            obsids2 = st.multiselect('Select Observation Column Names:', obsids)
-            wnam = st.text_input('Enter Watershed Name:')
-    elif rchids2 and obd_file:
-        obd_df, obsids = utils.get_obd_obs(obd_file)
-        with col2:
-            obsids2 = st.multiselect('Select Observation Column Names:', obsids)
-            wnam = st.text_input('Enter Watershed Name:')
+obd_file = None
+### 
 
-
+if wd_path:    
+    stf_df, obd_file, stdate, caldate, eddate, obd_df, rchids2, obsids2, wnam = utils.init_set(wd_path, line, col1, col2, obsids, obd_file)
 
 def main(df, sims_list):
-
     with st.beta_expander('{} Dataframe for Simulated and Observed Stream Discharge'.format(wnam)):
         st.dataframe(df, height=500)
         st.markdown(utils.filedownload(df), unsafe_allow_html=True)
 
     if obd_file:
-        stats_df = utils.get_stats_df(df, sims_list)
+        stats_df = utils.get_stats_df(df, sims_list, col1)
         with col2:
             st.markdown(
                 """
